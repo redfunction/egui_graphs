@@ -218,6 +218,9 @@ pub struct GraphView<
     settings_navigation: SettingsNavigation,
     settings_style: SettingsStyle,
 
+    /// See [`GraphView::with_continuous_repaint`].
+    continuous_repaint: bool,
+
     custom_id: Option<String>,
 
     #[cfg(feature = "events")]
@@ -331,7 +334,12 @@ where
         // Consolidated writes at the end of the frame
         view.save(ui, resp.id, &self.custom_id);
 
-        ui.ctx().request_repaint();
+        // An animated (force-directed) layout needs the next frame; a static one
+        // does not, and asking anyway redraws the whole app forever with
+        // nothing moving. Input still repaints on its own.
+        if self.continuous_repaint {
+            ui.ctx().request_repaint();
+        }
 
         resp
     }
@@ -358,6 +366,7 @@ where
             settings_style: SettingsStyle::default(),
             settings_interaction: SettingsInteraction::default(),
             settings_navigation: SettingsNavigation::default(),
+            continuous_repaint: true,
 
             custom_id: None,
 
@@ -366,6 +375,15 @@ where
 
             _marker: PhantomData,
         }
+    }
+
+    /// Whether the widget asks egui for another frame after every frame it
+    /// draws. `true` (the default) keeps an animated layout moving. A static
+    /// layout should turn it off: otherwise the app redraws continuously —
+    /// a full CPU core — for as long as the graph is on screen.
+    pub fn with_continuous_repaint(mut self, on: bool) -> Self {
+        self.continuous_repaint = on;
+        self
     }
 
     #[cfg(feature = "events")]
